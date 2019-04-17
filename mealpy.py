@@ -76,18 +76,31 @@ class MealPal():
         return request.json()['schedules']
 
     def get_schedule_by_restaurant_name(self, restaurant_name, city_name):
-        restaurant = next(
-            i
-            for i in self.get_schedules(city_name)
-            if i['restaurant']['name'] == restaurant_name
-        )
-        return restaurant
+        try:
+            return next(
+                i
+                for i in self.get_schedules(city_name)
+                if i['restaurant']['name'] == restaurant_name
+            )
+        except StopIteration:
+            raise Exception("Restaurnt {} does not offer meals in {} today!".format(restaurant_name, city_name))
 
     def get_schedule_by_meal_name(self, meal_name, city_name):
         try:
             return next(i for i in self.get_schedules(city_name) if i['meal']['name'] == meal_name)
         except StopIteration:
-            raise Exception("No meal {} from {} today!".format(meal_name, city_name))
+            raise Exception("Meal {} is not offered in {} today!".format(meal_name, city_name))
+
+    def get_schedule_by_meal_name_and_restaurant_name(self, meal_name, restaurant_name, city_name):
+        try:
+            return next(
+                i
+                for i in self.get_schedules(city_name)
+                if i['restaurant']['name'] == restaurant_name
+                    and i['meal']['name'] == meal_name
+            )
+        except StopIteration:
+            raise Exception("Meal {} is not offered from {} in {} today!".format(meal_name, restaurant_name, city_name))
 
     def reserve_meal(
             self,
@@ -101,7 +114,9 @@ class MealPal():
         if cancel_current_meal:
             self.cancel_current_meal()
 
-        if meal_name:
+        if meal_name and restaurant_name:
+            schedule_id = self.get_schedule_by_meal_name_and_restaurant_name(meal_name, restaurant_name, city_name)['id']
+        elif meal_name:
             schedule_id = self.get_schedule_by_meal_name(meal_name, city_name)['id']
         else:
             schedule_id = self.get_schedule_by_restaurant_name(restaurant_name, city_name)['id']
@@ -153,7 +168,7 @@ def execute_reserve_meal(mealpal, MEALS):
             else:
                 print('Reservation error, retrying!')
         except Exception as e:
-            print('Retrying because the following exception: ', e)
+            print('Could not make reservation: ', e)
             time.sleep(0.05)
 
     return "Did not find anything you like in the menu!"
