@@ -3,6 +3,7 @@ import json
 import time
 from os import path, environ
 from base64 import b64decode
+from datetime import datetime
 import boto3
 import requests
 import strictyaml
@@ -33,6 +34,7 @@ USE_KEYRING = True
 def load_config():
     schema = strictyaml.Map({
         'email_address': strictyaml.Email(),
+        'topic_arn': strictyaml.Str(),
         'meals': strictyaml.Seq(strictyaml.MapPattern(strictyaml.Str(), strictyaml.Str()))
     })
 
@@ -139,7 +141,7 @@ class MealPal():
         raise NotImplementedError()
 
 
-def execute_reserve_meal(mealpal, MEALS):
+def execute_reserve_meal(mealpal, MEALS, topic_arn):
 
     # Try to login
     while True:
@@ -163,8 +165,11 @@ def execute_reserve_meal(mealpal, MEALS):
                 meal_name=meal_name
             )
             if status_code == 200:
-                print("Successfully reserved {} from {}".format(meal_name, restaurant_name))
-                return "Successfully reserved {} from {}".format(meal_name, restaurant_name)
+                msg = "Successfully reserved {} from {}".format(meal_name, restaurant_name)
+                subject = "MealPal reservation for {}".format(datetime.today().strftime("%Y-%m-%d"))
+                print(msg)
+                publish_to_sns(msg, subject, topic_arn)
+                return msg
             else:
                 print('Reservation error, retrying!')
         except Exception as e:
@@ -173,17 +178,25 @@ def execute_reserve_meal(mealpal, MEALS):
 
     return "Did not find anything you like in the menu!"
 
+def publish_to_sns(msg, subject, topic_arn):
+    boto3.client('sns').publish(
+        TopicArn=topic_arn,
+        Message=msg,
+        Subject=subject
+    )
+
 def mealpal_handler(event, context):
     configurations = load_config()
     EMAIL = configurations['email_address']
     MEALS = configurations['meals']
+    topic_arn = configurations['topic_arn']
 
     encrypted = environ['password']
     PASSWORD = boto3.client('kms').decrypt(CiphertextBlob=b64decode(encrypted))['Plaintext'].decode('utf-8')
 
     mealpal = MealPal(EMAIL, PASSWORD)
 
-    return execute_reserve_meal(mealpal, MEALS)
+    return execute_reserve_meal(mealpal, MEALS, topic_arn)
 
 if __name__ == "__main__":
     mealpal_handler('', '')

@@ -1,5 +1,6 @@
 ---
 email_address: 'tianrunhe@gmail.com'
+topic_arn: 'arn:aws:sns:us-east-1:481497395090:mealpal-reservation'
 meals:
   - meal_name: 'Beets By Evergreens'
     restaurant_name: 'Evergreens - Lenora & 6th'
