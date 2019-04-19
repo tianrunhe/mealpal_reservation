@@ -20,17 +20,18 @@ service: mealpal-reservation # NOTE: update this with your service name
 provider:
   name: aws
   runtime: python3.7
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - sns:Publish
+      Resource: "arn:aws:sns:us-east-1:481497395090:mealpal-reservation"
 
 # you can overwrite defaults here
 #  stage: dev
 #  region: us-east-1
 
 # you can add statements to the Lambda function's IAM Role here
-iamRoleStatements:
-  - Effect: "Allow"
-    Action:
-      - "sns:Publish"
-    Resource: "arn:aws:sns:us-east-1:481497395090:mealpal-reservation"
+
 
 # you can define service wide environment variables here
 #  environment:
