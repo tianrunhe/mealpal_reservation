@@ -157,6 +157,8 @@ def execute_reserve_meal(mealpal, MEALS, topic_arn):
         restaurant_name = meal['restaurant_name']
         meal_name = meal['meal_name']
         print('Trying to reserve {} from {}'.format(meal_name, restaurant_name))
+
+        reserved = False;
         try:
             status_code = mealpal.reserve_meal(
                 '12:00pm-12:15pm',
@@ -167,16 +169,19 @@ def execute_reserve_meal(mealpal, MEALS, topic_arn):
             if status_code == 200:
                 msg = "Successfully reserved {} from {}".format(meal_name, restaurant_name)
                 subject = "MealPal reservation for {}".format(datetime.today().strftime("%Y-%m-%d"))
-                print(msg)
+                reserved = True;
                 publish_to_sns(msg, subject, topic_arn)
-                return msg
+                return
             else:
                 print('Reservation error, retrying!')
         except Exception as e:
             print('Could not make reservation: ', e)
             time.sleep(0.05)
 
-    return "Did not find anything you like in the menu!"
+    if not reserved:
+        msg = "Did not find any meals in your preference list today."
+        subject = "DID NOT MAKE ANY MEALPAL RESERVATION for {}".format(datetime.today().strftime("%Y-%m-%d"))
+        publish_to_sns(msg, subject, topic_arn)
 
 def publish_to_sns(msg, subject, topic_arn):
     boto3.client('sns').publish(
