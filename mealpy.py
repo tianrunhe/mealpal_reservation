@@ -1,6 +1,7 @@
-import getpass
 import json
+import random
 import time
+import urllib.parse
 from os import path, environ
 from base64 import b64decode
 from datetime import datetime
@@ -158,7 +159,7 @@ def execute_reserve_meal(mealpal, MEALS, topic_arn):
         meal_name = meal['meal_name']
         print('Trying to reserve {} from {}'.format(meal_name, restaurant_name))
 
-        reserved = False;
+        reserved = False
         try:
             status_code = mealpal.reserve_meal(
                 '12:00pm-12:15pm',
@@ -169,7 +170,39 @@ def execute_reserve_meal(mealpal, MEALS, topic_arn):
             if status_code == 200:
                 msg = "Successfully reserved {} from {}".format(meal_name, restaurant_name)
                 subject = "MealPal reservation for {}".format(datetime.today().strftime("%Y-%m-%d"))
-                reserved = True;
+                reserved = True
+                publish_to_sns(msg, subject, topic_arn)
+                return
+            else:
+                print('Reservation error, retrying!')
+        except Exception as e:
+            print('Could not make reservation: ', e)
+            time.sleep(0.05)
+
+    if not reserved: # no favorite meals are offered today
+        apigateway_client = boto3.client('apigateway')
+        response = apigateway_client.get_rest_apis()
+        api_id = next(item for item in response['items'] if item["name"] == "dev-mealpal-api")['id']
+        url = f'http://{api_id}.execute-api.us-east-1.amazonaws.com/dev'
+        cities = requests.get(url + '/cities').json()
+        seattle_city = next(city for city in cities if city['name'] == 'Seattle')
+        neighborhood = seattle_city['neighborhoods'][0]
+        office = urllib.parse.quote('2021 7th Ave, Seattle, WA, 98121')
+        schedules = requests.get(url + '/find/' + seattle_city['id'] + '/' + neighborhood['id'] + "?office=" + office).json()
+        print("Going to reserve a random meal from the top 5 closest restaurants")
+        schedule = schedules[0:5][random.randint(0,4)]
+
+        try:
+            status_code = mealpal.reserve_meal(
+                '12:00pm-12:15pm',
+                city_name='Seattle',
+                restaurant_name=schedule['restaurant']['name'],
+                meal_name=schedule['meal']['name']
+            )
+            if status_code == 200:
+                msg = "Successfully reserved {} from {}".format(schedule['meal']['name'], schedule['restaurant']['name'])
+                subject = "MealPal reservation for {}".format(datetime.today().strftime("%Y-%m-%d"))
+                reserved = True
                 publish_to_sns(msg, subject, topic_arn)
                 return
             else:

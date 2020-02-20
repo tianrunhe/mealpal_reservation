@@ -20,11 +20,17 @@ service: mealpal-reservation # NOTE: update this with your service name
 provider:
   name: aws
   runtime: python3.7
+  memorySize: 128
+  timeout: 120 # 2 minutes
   iamRoleStatements:
     - Effect: Allow
       Action:
         - sns:Publish
       Resource: "arn:aws:sns:us-east-1:481497395090:mealpal-reservation"
+    - Effect: Allow
+      Action:
+        - apigateway:*
+      Resource: "*"
 
 # you can overwrite defaults here
 #  stage: dev
